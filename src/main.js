@@ -2,6 +2,45 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import guide from '../docs/guide.md?raw';
 import './style.css';
+const templateModules = import.meta.glob('../practice/模板/*.md', {query:'?raw',import:'default',eager:true});
+const templateById = Object.fromEntries(Object.entries(templateModules).map(([path,content])=>[Number(path.match(/练习(\d{2})\.md$/)?.[1]),content]));
+const acceptanceUrl = 'https://github.com/nikon2023/Logseq-2.0-DB-class/blob/main/practice/03-%E7%BB%83%E4%B9%A0%E9%AA%8C%E6%94%B6%E8%A1%A8.md';
+function addTemplateCards(){
+ const article = document.querySelector('#article');
+ if(!article) return;
+ const used=new Set();
+ for(const element of article.querySelectorAll('h2,h3,p')){
+   const match=element.textContent.match(/(?:^|\s)练习\s*(\d{2})(?=\s|[：:])/);
+   if(!match)continue;
+   const id=Number(match[1]);
+   if(!templateById[id] || used.has(id))continue;
+   used.add(id);
+   const card=document.createElement('div');card.className='inline-template';
+   card.innerHTML='<div class="template-meta"><span>LOGSEQ PRACTICE '+String(id).padStart(2,'0')+'</span><strong>对应练习模板</strong></div><div class="template-controls"><button type="button" data-template-view="'+id+'">查看模板</button><button type="button" data-template-copy="'+id+'">复制内容</button><a target="_blank" rel="noopener noreferrer" href="https://github.com/nikon2023/Logseq-2.0-DB-class/blob/main/practice/%E6%A8%A1%E6%9D%BF/%E7%BB%83%E4%B9%A0'+String(id).padStart(2,'0')+'.md">GitHub 原稿 ↗</a></div><pre data-template-content="'+id+'" hidden></pre><span class="template-status" data-template-status="'+id+'" aria-live="polite"></span>';
+   card.querySelector('pre').textContent=templateById[id];
+   element.insertAdjacentElement('afterend',card);
+ }
+ if(active===0){
+   const env=Array.from(article.querySelectorAll('h3')).find(e=>e.textContent.includes('0.2 环境设置'));
+   if(env){
+     const div=document.createElement('div');div.className='inline-template acceptance-card';
+     div.innerHTML='<strong>环境设置配套文件 · 练习验收表</strong><p>首次学习前请打开验收表，复制到 Logseq 中建立自己的记录页面。</p><a target="_blank" rel="noopener noreferrer" href="'+acceptanceUrl+'">打开《练习验收表.md》↗</a>';
+     env.insertAdjacentElement('afterend',div);
+   }
+ }
+ article.querySelectorAll('[data-template-view]').forEach(b=>b.onclick=()=>{
+   const id=Number(b.dataset.templateView), pre=article.querySelector('[data-template-content="'+id+'"]');
+   pre.hidden=!pre.hidden; b.textContent=pre.hidden?'查看模板':'收起模板';
+ });
+ article.querySelectorAll('[data-template-copy]').forEach(b=>b.onclick=async()=>{
+   const id=Number(b.dataset.templateCopy),status=article.querySelector('[data-template-status="'+id+'"]');
+   const txt=templateById[id];let success=false;
+   try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(txt);success=true;}}catch{}
+   if(!success){const field=document.createElement('textarea');field.value=txt;field.style.position='fixed';field.style.opacity='0';document.body.appendChild(field);field.select();try{success=document.execCommand('copy')}catch{}field.remove();}
+   status.textContent=success?'已复制。可粘贴到 Logseq 的目标页面。':'自动复制失败；请展开模板，手动选择并复制文本。';
+   if(!success){article.querySelector('[data-template-content="'+id+'"]').hidden=false;}
+ });
+}
 
 const chapterNames = ['开始之前','第一章 · 为什么需要第二大脑','第二章 · 构建数字记忆体','第三章 · 创建高级的思考特质','第四章 · 误区、障碍和方法论','第五章 · 数字遗产与家族传承'];
 const chapterDescriptions = ['环境、版本与安全','外部记忆与记录','块、标签、集群、日志','关联、图谱与查询','长期积累与两条路径','传承、备份与未来'];
@@ -57,12 +96,13 @@ function render(){
     </main>
    </div>
   </div>`;
+  addTemplateCards();
   document.querySelectorAll('[data-chapter]').forEach(b=>b.onclick=()=>{active=Number(b.dataset.chapter);search='';mobileOpen=false;render();window.scrollTo({top:0,behavior:'smooth'});location.hash='chapter-'+active});
   document.querySelector('#menu-toggle').onclick=()=>{mobileOpen=!mobileOpen;document.querySelector('.sidebar').classList.toggle('open',mobileOpen)};
   document.querySelector('#prev').onclick=()=>{if(active>0){active--;search='';render();scrollTo(0,0)}};
   document.querySelector('#next').onclick=()=>{if(active<5){active++;search='';render();scrollTo(0,0)}};
   document.querySelectorAll('[data-exercise]').forEach(b=>b.onchange=()=>{progress[Number(b.dataset.exercise)]=b.checked;localStorage.setItem(storageKey,JSON.stringify(progress));render();document.querySelector('.practice-area').scrollIntoView({block:'center'})});
   document.querySelector('#reset').onclick=()=>{if(confirm('确定清空本浏览器所有学习勾选记录？')){progress={};localStorage.removeItem(storageKey);render()}};
-  const s=document.querySelector('#search');s.oninput=()=>{search=s.value;const article=document.querySelector('#article');article.innerHTML=DOMPurify.sanitize(marked.parse(shown));if(search.trim()){const walker=document.createTreeWalker(article,NodeFilter.SHOW_TEXT);const matches=[];while(walker.nextNode()){let n=walker.currentNode;if(!n.parentElement.closest('pre,code,a,script,style')&&n.nodeValue.toLowerCase().includes(search.toLowerCase()))matches.push(n)}for(const n of matches){const raw=n.nodeValue;const re=new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'ig');const mark=document.createElement('span');mark.innerHTML=escaped(raw).replace(re,x=>'<mark>'+escaped(x)+'</mark>');n.replaceWith(mark)}document.querySelector('mark')?.scrollIntoView({block:'center'})}};
+  const s=document.querySelector('#search');s.oninput=()=>{search=s.value;const article=document.querySelector('#article');article.innerHTML=DOMPurify.sanitize(marked.parse(shown));if(search.trim()){const walker=document.createTreeWalker(article,NodeFilter.SHOW_TEXT);const matches=[];while(walker.nextNode()){let n=walker.currentNode;if(!n.parentElement.closest('pre,code,a,script,style')&&n.nodeValue.toLowerCase().includes(search.toLowerCase()))matches.push(n)}for(const n of matches){const raw=n.nodeValue;const re=new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'ig');const mark=document.createElement('span');mark.innerHTML=escaped(raw).replace(re,x=>'<mark>'+escaped(x)+'</mark>');n.replaceWith(mark)}document.querySelector('mark')?.scrollIntoView({block:'center'})}addTemplateCards();};
 }
 const match=location.hash.match(/^#chapter-(\d)$/);if(match)active=Math.min(5,Number(match[1]));render();
