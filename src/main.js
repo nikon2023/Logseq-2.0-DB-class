@@ -5,8 +5,8 @@ import './style.css';
 
 const chapterNames = ['开始之前','第一章 · 为什么需要第二大脑','第二章 · 构建数字记忆体','第三章 · 创建高级的思考特质','第四章 · 误区、障碍和方法论','第五章 · 数字遗产与家族传承'];
 const chapterDescriptions = ['环境、版本与安全','外部记忆与记录','块、标签、集群、日志','关联、图谱与查询','长期积累与两条路径','传承、备份与未来'];
-const sections = guide.split(/(?=^# (?:第一章|第二章|第三章|第四章|第五章)\b)/m);
-const chapters = sections.length===6 ? sections : [guide];
+const sections = guide.split(/(?=^# 第[一二三四五]章)/m);
+const chapters = sections.length===6 ? sections : [guide, ...Array(5).fill('章节解析失败，请检查 Markdown 标题结构。')];
 const app=document.querySelector('#app');
 const storageKey='logseq-second-brain-v2-progress';
 const searchKey='logseq-second-brain-v2-search';
